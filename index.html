@@ -209,7 +209,9 @@ async function loadAll(){
       const auc=d.auctions[type];
       if(!gpuMap[name])gpuMap[name]={name,color:gc(name),uids:new Set(),cards:0,hourly:0,
         target:auc?.target_cards||0,tPrice:auc?(auc.target_price/100):0,mPrice:auc?(auc.max_price/100):0};
-      entries.forEach(e=>{
+      // Deduplicate: entries repeat per tempo — keep one per uid
+      const seen={};entries.forEach(e=>{seen[e.uid]=e;});
+      Object.values(seen).forEach(e=>{
         gpuMap[name].uids.add(e.uid);
         gpuMap[name].cards+=e.count;
         gpuMap[name].hourly+=e.payout;
