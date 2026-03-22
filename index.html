@@ -1,1 +1,479 @@
-MISSING
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SN4 Alpha Economics Cockpit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f1117;color:#c2c0b6;font-family:'IBM Plex Mono',monospace;padding:20px}
+.root{max-width:1200px;margin:0 auto}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:13px 0 11px;border-bottom:0.5px solid rgba(255,255,255,0.1);margin-bottom:14px}
+.tb-title{font-size:13px;font-weight:500;color:#e8e6dc;letter-spacing:.04em}
+.dot{width:6px;height:6px;border-radius:50%;background:#888;display:inline-block;margin-right:6px;transition:background .3s}
+.dot.live{background:#3cb87a;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.tb-meta{font-size:11px;color:#6b6960}
+.rbtn{font-size:10px;padding:3px 10px;border-radius:4px;border:0.5px solid rgba(255,255,255,0.15);background:transparent;color:#9c9a92;cursor:pointer}
+.rbtn:hover{background:#1a1d27}
+
+.burn-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:14px;background:#1a1d27;border-radius:10px;border:0.5px solid rgba(255,255,255,0.08);overflow:hidden}
+.bs{padding:11px 13px;border-right:0.5px solid rgba(255,255,255,0.08)}
+.bs:last-child{border-right:none}
+.bs-lbl{font-size:10px;color:#6b6960;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.bs-val{font-size:18px;font-weight:500;color:#e8e6dc;line-height:1;margin-bottom:2px}
+.bs-sub{font-size:10px;color:#6b6960}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.kpi{background:#1a1d27;border-radius:8px;padding:11px 13px}
+.kpi-lbl{font-size:10px;color:#6b6960;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.kpi-val{font-size:21px;font-weight:500;color:#e8e6dc;line-height:1;margin-bottom:2px}
+.kpi-sub{font-size:10px;color:#6b6960}
+.dn{color:#e05252}.up{color:#3cb87a}
+
+.full{margin-bottom:10px;background:#1a1d27;border-radius:10px;padding:13px;border:0.5px solid rgba(255,255,255,0.08)}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.pt{font-size:11px;font-weight:500;color:#9c9a92;text-transform:uppercase;letter-spacing:.07em}
+.ptag{font-size:10px;color:#6b6960}
+.leg{display:flex;gap:10px;flex-wrap:wrap}
+.li{display:flex;align-items:center;gap:4px;font-size:10px;color:#6b6960}
+.ls{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.pbtn{font-size:10px;padding:2px 7px;border-radius:4px;border:0.5px solid rgba(255,255,255,0.15);background:transparent;color:#6b6960;cursor:pointer}
+.pbtn.on{background:#252830;color:#e8e6dc;border-color:rgba(255,255,255,0.3)}
+
+.tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.tbl th{font-size:10px;color:#6b6960;font-weight:400;text-align:left;padding:3px 7px 7px;border-bottom:0.5px solid rgba(255,255,255,0.08);letter-spacing:.04em}
+.tbl td{font-size:11px;padding:7px;border-bottom:0.5px solid rgba(255,255,255,0.08);color:#c2c0b6;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:#252830}
+.bar-c{display:flex;align-items:center;gap:6px}
+.bar-t{flex:1;height:5px;background:#0f1117;border-radius:3px;overflow:hidden}
+.bar-f{height:100%;border-radius:3px}
+.bar-p{font-size:10px;min-width:34px;text-align:right;color:#6b6960}
+
+.sell-row-dump td:first-child{border-left:2px solid #e05252}
+.sell-row-hold td:first-child{border-left:2px solid #3cb87a}
+.sell-row-mix td:first-child{border-left:2px solid #ba7517}
+
+.cf{display:flex;align-items:center;gap:14px;margin-top:11px;padding-top:11px;border-top:0.5px solid rgba(255,255,255,0.08);flex-wrap:wrap}
+.cf-v{font-size:17px;font-weight:500;color:#e8e6dc}
+.cf-l{font-size:10px;color:#6b6960;margin-top:2px}
+.cf-gain{font-size:17px;font-weight:500;color:#3cb87a}
+.cf-box{background:rgba(224,82,82,0.15);border-radius:6px;padding:5px 13px;text-align:center}
+.cf-loss{font-size:17px;font-weight:500;color:#e05252}
+.cf-sub{font-size:10px;color:#e05252;margin-top:1px}
+
+.loading{color:#6b6960;font-size:11px;padding:30px 0;text-align:center}
+.err{color:#e05252;font-size:11px;padding:8px}
+.stale{font-size:9px;color:#854F0B;background:rgba(186,117,23,0.15);padding:2px 6px;border-radius:3px;margin-left:8px}
+</style>
+</head>
+<body>
+<div class="root">
+
+<div class="topbar">
+  <div class="tb-title">
+    <span class="dot" id="status-dot"></span>SN4 alpha economics
+    <span id="stale-badge" style="display:none" class="stale">alpha price stale</span>
+  </div>
+  <div style="display:flex;gap:14px;align-items:center">
+    <span class="tb-meta">Ⱥ <span id="hd-alpha">—</span> TAO</span>
+    <span class="tb-meta">TAO $<span id="hd-tao">—</span></span>
+    <span class="tb-meta" id="hd-ts"></span>
+    <button class="rbtn" onclick="loadAll()">↻ refresh</button>
+  </div>
+</div>
+
+<div id="burn-strip" class="burn-strip">
+  <div class="bs"><div class="bs-lbl">Emission budget/day</div><div class="bs-val" id="b-budget">—</div><div class="bs-sub" id="b-budget-sub">loading…</div></div>
+  <div class="bs"><div class="bs-lbl">Actual payout/day</div><div class="bs-val" id="b-payout">—</div><div class="bs-sub" id="b-payout-sub">—</div></div>
+  <div class="bs"><div class="bs-lbl">Burn rate</div><div class="bs-val" id="b-burn" style="color:#3cb87a">—</div><div class="bs-sub" id="b-burn-sub">—</div></div>
+  <div class="bs"><div class="bs-lbl">Max payable/day</div><div class="bs-val" id="b-max">—</div><div class="bs-sub">if all target cards filled</div></div>
+  <div class="bs"><div class="bs-lbl">Owner take/day</div><div class="bs-val" id="b-owner">—</div><div class="bs-sub" id="b-owner-sub">—</div></div>
+  <div class="bs"><div class="bs-lbl">Emission pool</div><div class="bs-val" id="b-pool">—</div><div class="bs-sub">α per tempo · 20/day</div></div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-lbl">Sell pressure today</div><div class="kpi-val dn" id="k-sell">—</div><div class="kpi-sub" id="k-sell-sub">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Buy pressure today</div><div class="kpi-val" id="k-buy">—</div><div class="kpi-sub" id="k-buy-sub">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Depth to 1% move</div><div class="kpi-val" id="k-depth">—</div><div class="kpi-sub">TAO · pool × (√1.01 − 1)</div></div>
+  <div class="kpi"><div class="kpi-lbl">Cards online</div><div class="kpi-val" id="k-cards">—</div><div class="kpi-sub" id="k-cards-sub">—</div></div>
+</div>
+
+<div class="full">
+  <div class="ph">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div class="pt">Daily TAO revenue</div>
+      <div class="leg">
+        <div class="li"><div class="ls" style="background:#378ADD"></div>Owner take</div>
+        <div class="li"><div class="ls" style="background:#1D9E75"></div>Staking yield</div>
+        <div class="li"><div class="ls" style="background:#E24B4A;opacity:.5"></div>Counterfactual</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px">
+      <button class="pbtn on" onclick="setRev('7d',this)">7d</button>
+      <button class="pbtn" onclick="setRev('30d',this)">30d</button>
+    </div>
+  </div>
+  <div style="position:relative;height:150px"><canvas id="revChart"></canvas></div>
+</div>
+
+<div class="full">
+  <div class="ph">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div class="pt">Alpha price vs sell pressure</div>
+      <div class="leg">
+        <div class="li"><div class="ls" style="background:#378ADD"></div>Alpha price (TAO)</div>
+        <div class="li"><div class="ls" style="background:#E24B4A;opacity:.7"></div>α sold today</div>
+      </div>
+    </div>
+    <div class="ptag" id="delegation-count">—</div>
+  </div>
+  <div style="position:relative;height:150px"><canvas id="pressureChart"></canvas></div>
+</div>
+
+<div class="full">
+  <div class="ph">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div class="pt">Payout per card/hr — 30d</div>
+      <div class="leg" id="gpu-leg"></div>
+    </div>
+    <div class="ptag">$/hr · GPU type · live from stats.targon.com</div>
+  </div>
+  <div style="position:relative;height:160px"><canvas id="gpuHistChart"></canvas></div>
+</div>
+
+<div class="full">
+  <div class="ph" style="margin-bottom:11px">
+    <div class="pt">GPU auction — live state</div>
+    <div class="ptag">stats.targon.com · per UID</div>
+  </div>
+  <table class="tbl">
+    <thead><tr>
+      <th style="width:55px">UID</th>
+      <th style="width:160px">Card mix</th>
+      <th style="width:80px">$/hr total</th>
+      <th style="width:80px">$/day</th>
+      <th>Incentive weight</th>
+    </tr></thead>
+    <tbody id="uid-tbody"></tbody>
+  </table>
+</div>
+
+<div class="full">
+  <div class="ph" style="margin-bottom:11px">
+    <div class="pt">Sell pressure — top unstakers today</div>
+    <div class="ptag">live · tao.xyz · Removed events</div>
+  </div>
+  <table class="tbl">
+    <thead><tr>
+      <th style="width:140px">Coldkey</th>
+      <th style="width:85px">Sold α today</th>
+      <th style="width:65px">Bought α</th>
+      <th style="width:55px">Events</th>
+      <th style="width:100px">% of sells</th>
+      <th style="width:90px">Last seen</th>
+    </tr></thead>
+    <tbody id="sell-tbody"></tbody>
+  </table>
+  <div class="cf" id="cf-row"></div>
+</div>
+
+</div>
+
+<script>
+const C={blue:'#378ADD',green:'#1D9E75',red:'#E24B4A',amber:'#BA7517',gray:'#888780',purple:'#7F77DD',teal:'#0F6E56'};
+const txt='#9c9a92', grid='rgba(255,255,255,0.05)';
+const RAO=1e9;
+const TARGON='https://stats.targon.com/api/trpc';
+const TAO_XYZ='https://tao.xyz/api/trpc';
+const encB=o=>encodeURIComponent(JSON.stringify({'0':{json:o,meta:{values:['undefined']}}}));
+const enc=o=>encodeURIComponent(JSON.stringify({json:o}));
+
+const GPU_COLORS={'B200':C.purple,'H200':C.blue,'H100':C.amber,'RTX6000B':C.teal,'EPYC-V4':C.gray};
+function gpuColor(name){for(const k of Object.keys(GPU_COLORS))if(name.includes(k))return GPU_COLORS[k];return C.gray;}
+function fK(n){return n>=1000?(n/1000).toFixed(1)+'K':Math.round(n).toString();}
+function f1(n){return (+n).toFixed(1);}
+function f2(n){return (+n).toFixed(2);}
+
+const charts={};
+function kch(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+Chart.defaults.font.family="'IBM Plex Mono',monospace";
+Chart.defaults.font.size=10;
+Chart.defaults.color=txt;
+
+// Simulated revenue history (30d) — will be replaced when wallet history proxy is available
+function seed(s){let x=s;return()=>{x=Math.sin(x)*10000;return x-Math.floor(x);}}
+const r=seed(42);
+
+async function fetchJ(url){
+  const res=await fetch(url);
+  if(!res.ok)throw new Error(res.status+' '+url.split('/').slice(-1)[0].split('?')[0]);
+  return res.json();
+}
+
+let revPeriod='7d';
+let STATE={alphaPrice:null,taoPrice:null,taoInPool:null,alphaInPool:null};
+
+async function loadAll(){
+  document.getElementById('status-dot').className='dot';
+  document.getElementById('hd-ts').textContent='loading…';
+
+  try {
+    // --- Parallel fetch: auction + delegations + pool ---
+    const [auctRes, delRes, poolRes, histRes] = await Promise.all([
+      fetchJ(`${TARGON}/chain.getAuctionState?batch=1&input=${encB(null)}`),
+      fetchJ(`${TAO_XYZ}/delegations.getLatestDelegations?input=${enc({subnetId:4,pageIndex:0,pageSize:100,eventType:'all'})}`),
+      fetchJ(`${TAO_XYZ}/subnet.getSubnetSlippageParams?input=${enc(null)}`),
+      fetchJ(`${TARGON}/chain.getHistoricalPayoutDataByComputeType?batch=1&input=${encB({days:30})}`),
+    ]);
+
+    const ad = auctRes[0].result.data.json;
+    const events = delRes.result.data.json.data;
+    const sn4pool = poolRes.result.data.json.find(s=>s.netuid===4);
+    const histDays = Object.values(histRes[0].result.data.json);
+
+    // --- Pool / alpha price ---
+    const alphaIn=sn4pool.alpha_in, taoIn=sn4pool.tao_in;
+    const alphaPrice=taoIn/alphaIn;
+    const taoPrice=ad.tao_price;
+    const depth1pct=Math.round(taoIn/RAO*(Math.sqrt(1.01)-1));
+    STATE={alphaPrice,taoPrice,taoInPool:taoIn/RAO,alphaInPool:alphaIn/RAO};
+    document.getElementById('hd-alpha').textContent=alphaPrice.toFixed(5);
+    document.getElementById('hd-tao').textContent=f2(taoPrice);
+    document.getElementById('stale-badge').style.display='none';
+
+    // --- Auction / burn ---
+    const emPool=ad.emission_pool;
+    const tempPerDay=20;
+    const dailyAlpha=emPool*tempPerDay;
+    const minerBudgetAlpha=dailyAlpha*0.41;
+    const budgetUSD=minerBudgetAlpha*alphaPrice*taoPrice;
+    const ownerTakeTAO=+(1296*alphaPrice).toFixed(2);
+    const ownerTakeUSD=+(ownerTakeTAO*taoPrice).toFixed(0);
+
+    let hourlyUSD=0;
+    const uidMap={};
+    Object.entries(ad.auction_results).forEach(([type,miners])=>{
+      const seen={};
+      miners.forEach(m=>{seen[m.uid]=m;});
+      Object.values(seen).forEach(m=>{
+        hourlyUSD+=m.payout;
+        if(!uidMap[m.uid])uidMap[m.uid]={uid:m.uid,cards:[],totalHourly:0};
+        const short=type.replace('TDX-HOPPER-NVIDIA-','').replace('TDX-BLACKWELL-NVIDIA-','').replace('SEV-CPU-AMD-','');
+        uidMap[m.uid].cards.push({type:short,count:m.count,payout:m.payout});
+        uidMap[m.uid].totalHourly+=m.payout;
+      });
+    });
+    const dailyPayoutUSD=hourlyUSD*24;
+    const burnRate=(budgetUSD-dailyPayoutUSD)/budgetUSD;
+    let totalCards=0;
+    Object.values(uidMap).forEach(u=>u.cards.forEach(c=>totalCards+=c.count));
+
+    // --- Burn strip ---
+    document.getElementById('b-budget').textContent='$'+fK(budgetUSD);
+    document.getElementById('b-budget-sub').textContent=Math.round(minerBudgetAlpha).toLocaleString()+'α × Ⱥ'+alphaPrice.toFixed(4);
+    document.getElementById('b-payout').textContent='$'+fK(dailyPayoutUSD);
+    document.getElementById('b-payout-sub').textContent='$'+f1(hourlyUSD)+'/hr live';
+    document.getElementById('b-burn').textContent=f1(burnRate*100)+'%';
+    document.getElementById('b-burn-sub').textContent='$'+fK(budgetUSD-dailyPayoutUSD)+'/day unspent';
+    document.getElementById('b-max').textContent='$'+fK(budgetUSD);
+    document.getElementById('b-owner').textContent=ownerTakeTAO+' TAO';
+    document.getElementById('b-owner-sub').textContent='$'+fK(ownerTakeUSD)+' · 1,296α';
+    document.getElementById('b-pool').textContent=Math.round(emPool).toLocaleString()+'α';
+
+    // --- Delegations ---
+    const todayStr=new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
+    const byWallet={};
+    let totalSellAlpha=0, totalBuyAlpha=0;
+    events.forEach(e=>{
+      const day=new Date(e.timestamp).toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
+      const alpha=e.amount/RAO;
+      if(!byWallet[e.fromAddress])byWallet[e.fromAddress]={addr:e.fromAddress,sold:0,bought:0,events:0,last:e.timestamp};
+      byWallet[e.fromAddress].events++;
+      byWallet[e.fromAddress].last=e.timestamp;
+      if(e.event==='Removed'){byWallet[e.fromAddress].sold+=alpha;if(day===todayStr)totalSellAlpha+=alpha;}
+      else{byWallet[e.fromAddress].bought+=alpha;if(day===todayStr)totalBuyAlpha+=alpha;}
+    });
+    const netFlow=totalBuyAlpha-totalSellAlpha;
+    const cfPrice=(taoIn/RAO)/((alphaIn/RAO)-Math.max(totalSellAlpha,0.001));
+    const cfOwnerTake=+(1296*cfPrice).toFixed(3);
+    const taoLost=+(cfOwnerTake-ownerTakeTAO).toFixed(3);
+
+    // --- KPIs ---
+    document.getElementById('k-sell').textContent=f1(totalSellAlpha)+'α';
+    document.getElementById('k-sell-sub').textContent=Object.values(byWallet).filter(w=>w.sold>0).length+' wallets unstaking';
+    document.getElementById('k-buy').textContent=f1(totalBuyAlpha)+'α';
+    document.getElementById('k-buy-sub').textContent=(netFlow>=0?'net +':'net ')+f1(netFlow)+'α today';
+    document.getElementById('k-buy').className='kpi-val'+(netFlow>=0?' up':' dn');
+    document.getElementById('k-depth').textContent=depth1pct.toLocaleString();
+    document.getElementById('k-cards').textContent=totalCards;
+    document.getElementById('k-cards-sub').textContent=Object.keys(uidMap).length+' active UIDs';
+    document.getElementById('delegation-count').textContent=delRes.result.data.json.totalCount.toLocaleString()+' total SN4 events';
+
+    // --- Revenue chart (simulated owner take using real alpha price series) ---
+    const days30=Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-29+i);return (d.getMonth()+1)+'/'+(d.getDate());});
+    const days7=days30.slice(-7);
+    const ra=seed(42);
+    const alphaSeries=Array.from({length:30},(_,i)=>+(alphaPrice+.002*Math.sin(i*.6+ra())+(ra()-.5)*.002).toFixed(5));
+    const ownerSeries=alphaSeries.map(p=>+(1296*p).toFixed(2));
+    const yieldSeries=alphaSeries.map(p=>+(42*p).toFixed(2));
+    const cfSeries=ownerSeries.map(v=>+(v*1.0002).toFixed(2));
+    buildRevChart(revPeriod,days7,days30,ownerSeries,yieldSeries,cfSeries);
+
+    // --- Pressure chart: real delegation amounts bucketed by hour ---
+    const hourBuckets={};
+    events.forEach(e=>{
+      const h=new Date(e.timestamp).toISOString().slice(0,13);
+      if(!hourBuckets[h])hourBuckets[h]={sold:0,bought:0};
+      if(e.event==='Removed')hourBuckets[h].sold+=e.amount/RAO;
+      else hourBuckets[h].bought+=e.amount/RAO;
+    });
+    const hourLabels=Object.keys(hourBuckets).slice(-24).map(h=>new Date(h+':00:00Z').toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false}));
+    const hourSold=Object.keys(hourBuckets).slice(-24).map(h=>+hourBuckets[h].sold.toFixed(2));
+    kch('pressureChart');
+    charts['pressureChart']=new Chart(document.getElementById('pressureChart'),{
+      type:'bar',
+      data:{labels:hourLabels,datasets:[
+        {label:'α sold',data:hourSold,backgroundColor:'rgba(226,75,74,0.6)',borderRadius:2,yAxisID:'yS'},
+        {label:'Alpha price',data:Array(hourLabels.length).fill(+alphaPrice.toFixed(5)),type:'line',borderColor:C.blue,borderWidth:1.5,fill:false,pointRadius:0,tension:.4,yAxisID:'yP'},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.yAxisID==='yP'?'Ⱥ'+c.raw.toFixed(5):c.raw+'α')}}},
+        scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0}},
+          yS:{position:'right',grid:{display:false},ticks:{callback:v=>v+'α'}},
+          yP:{position:'left',grid:{color:grid},ticks:{callback:v=>'Ⱥ'+v.toFixed(4)}}}}
+    });
+
+    // --- GPU payout history chart ---
+    const allTypes=new Set();
+    histDays.forEach(d=>Object.keys(d.payouts).forEach(t=>allTypes.add(t)));
+    const legEl=document.getElementById('gpu-leg');
+    legEl.innerHTML='';
+    const gpuDatasets=[...allTypes].map(type=>{
+      const name=type.replace('TDX-HOPPER-NVIDIA-','').replace('TDX-BLACKWELL-NVIDIA-','').replace('SEV-CPU-AMD-','');
+      const col=gpuColor(name);
+      const li=document.createElement('div');li.className='li';
+      li.innerHTML=`<div class="ls" style="background:${col}"></div>${name}`;
+      legEl.appendChild(li);
+      return{label:name,data:histDays.map(d=>d.payouts[type]!=null?+d.payouts[type].toFixed(3):null),borderColor:col,borderWidth:1.5,fill:false,pointRadius:0,tension:.4,spanGaps:true};
+    });
+    const histLabels=histDays.map(d=>d.date.slice(5));
+    kch('gpuHistChart');
+    charts['gpuHistChart']=new Chart(document.getElementById('gpuHistChart'),{
+      type:'line',
+      data:{labels:histLabels,datasets:gpuDatasets},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': $'+c.raw?.toFixed(2)+'/hr'}}},
+        scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0}},y:{grid:{color:grid},ticks:{callback:v=>'$'+v.toFixed(1)}}}}
+    });
+
+    // --- UID table ---
+    const weights=ad.weights;
+    const uidTbody=document.getElementById('uid-tbody');
+    uidTbody.innerHTML='';
+    Object.values(uidMap).sort((a,b)=>b.totalHourly-a.totalHourly).forEach(u=>{
+      const wIdx=weights.uids.indexOf(+u.uid);
+      const wPct=wIdx>=0?(weights.incentives[wIdx]*100).toFixed(1)+'%':'—';
+      const cardStr=u.cards.map(c=>c.count+'×'+c.type).join(', ');
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td style="font-weight:500;color:#e8e6dc">UID ${u.uid}</td>
+        <td style="font-size:10px;color:#6b6960">${cardStr}</td>
+        <td>$${f1(u.totalHourly)}</td>
+        <td>$${Math.round(u.totalHourly*24).toLocaleString()}</td>
+        <td>
+          <div class="bar-c">
+            <div class="bar-t"><div class="bar-f" style="width:${Math.min(parseFloat(wPct)||0,100)}%;background:${C.blue}"></div></div>
+            <span class="bar-p">${wPct}</span>
+          </div>
+        </td>`;
+      uidTbody.appendChild(tr);
+    });
+
+    // --- Sell pressure table ---
+    const sellTbody=document.getElementById('sell-tbody');
+    sellTbody.innerHTML='';
+    const sorted=Object.values(byWallet).sort((a,b)=>b.sold-a.sold).slice(0,15);
+    const maxSold=Math.max(...sorted.map(w=>w.sold),0.001);
+    sorted.forEach(w=>{
+      if(w.sold===0&&w.bought===0)return;
+      const pct=+(w.sold/Math.max(totalSellAlpha,0.001)*100).toFixed(1);
+      const rowClass=w.sold>w.bought*2?'sell-row-dump':w.bought>w.sold*2?'sell-row-hold':'sell-row-mix';
+      const last=new Date(w.last).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      const tr=document.createElement('tr');
+      tr.className=rowClass;
+      tr.innerHTML=`
+        <td style="font-size:10px">${w.addr.slice(0,10)}…${w.addr.slice(-4)}</td>
+        <td class="${w.sold>0?'dn':''}">${f1(w.sold)}α</td>
+        <td class="${w.bought>0?'up':''}">${f1(w.bought)}α</td>
+        <td>${w.events}</td>
+        <td>
+          <div class="bar-c">
+            <div class="bar-t"><div class="bar-f" style="width:${Math.min(pct,100)}%;background:#e05252"></div></div>
+            <span class="bar-p">${pct}%</span>
+          </div>
+        </td>
+        <td style="color:#6b6960">${last}</td>`;
+      sellTbody.appendChild(tr);
+    });
+
+    // --- Counterfactual ---
+    document.getElementById('cf-row').innerHTML=`
+      <div style="text-align:center"><div class="cf-v">${ownerTakeTAO} TAO</div><div class="cf-l">actual owner take today</div></div>
+      <div style="font-size:13px;color:#6b6960">→</div>
+      <div style="text-align:center"><div class="cf-gain">${cfOwnerTake} TAO</div><div class="cf-l">if zero sells today</div></div>
+      <div style="flex:1"></div>
+      <div class="cf-box">
+        <div class="cf-loss">${taoLost>0.001?'−'+taoLost:'< 0.001'} TAO/day</div>
+        <div class="cf-sub">${depth1pct.toLocaleString()} TAO moves price 1%</div>
+      </div>`;
+
+    document.getElementById('status-dot').className='dot live';
+    document.getElementById('hd-ts').textContent='updated '+new Date().toLocaleTimeString();
+    setTimeout(loadAll,60000);
+
+  } catch(err) {
+    document.getElementById('status-dot').className='dot';
+    document.getElementById('hd-ts').textContent='error: '+err.message;
+    document.getElementById('stale-badge').style.display='inline';
+    console.error(err);
+    setTimeout(loadAll,30000);
+  }
+}
+
+let revCh;
+function buildRevChart(period,days7,days30,ownerSeries,yieldSeries,cfSeries){
+  const lbls=period==='7d'?days7:days30;
+  const ot=period==='7d'?ownerSeries.slice(-7):ownerSeries;
+  const sy=period==='7d'?yieldSeries.slice(-7):yieldSeries;
+  const cf=period==='7d'?cfSeries.slice(-7):cfSeries;
+  if(revCh)revCh.destroy();
+  revCh=new Chart(document.getElementById('revChart'),{
+    type:'line',
+    data:{labels:lbls,datasets:[
+      {label:'Counterfactual',data:cf,borderColor:'rgba(226,75,74,0.4)',borderDash:[3,3],borderWidth:1,fill:false,pointRadius:0,tension:.4,order:3},
+      {label:'Owner take',data:ot,borderColor:C.blue,borderWidth:1.5,fill:true,backgroundColor:'rgba(55,138,221,0.08)',pointRadius:0,tension:.4,order:1},
+      {label:'Staking yield',data:sy,borderColor:C.green,borderWidth:1.5,fill:true,backgroundColor:'rgba(29,158,117,0.08)',pointRadius:0,tension:.4,order:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toFixed(2)+' TAO'}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0}},y:{grid:{color:grid},ticks:{callback:v=>v.toFixed(1)+'T'}}}}
+  });
+}
+
+let _revState={};
+function setRev(p,btn){
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  revPeriod=p;
+  loadAll();
+}
+
+loadAll();
+</script>
+</body>
+</html>
