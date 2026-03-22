@@ -223,10 +223,10 @@ async function loadAll(){
     const dailyPayout=totalHourly*24;
 
     // --- Burn ---
-    const emPool=d.emission_pool,dailyAlpha=emPool*20,minerBudget=dailyAlpha*0.41;
+    const emPool=d.emission_pool,dailyAlpha=emPool*20,minerBudget=dailyAlpha*0.41,ownerAlphaDay=dailyAlpha*0.18;
     const budgetUSD=minerBudget*ap*tp;
     const burnRate=(budgetUSD-dailyPayout)/budgetUSD*100;
-    const ownerTAO=+(1296*ap).toFixed(2),ownerUSD=+(ownerTAO*tp).toFixed(0);
+    const ownerTAO=+(ownerAlphaDay*ap).toFixed(2),ownerUSD=+(ownerTAO*tp).toFixed(0);
 
     document.getElementById('b-budget').textContent='$'+fK(budgetUSD);
     document.getElementById('b-budget-sub').textContent=Math.round(minerBudget).toLocaleString()+'α × Ⱥ'+ap.toFixed(4);
@@ -236,7 +236,7 @@ async function loadAll(){
     document.getElementById('b-burn-sub').textContent='$'+fK(budgetUSD-dailyPayout)+'/day unspent';
     document.getElementById('b-max').textContent='$'+fK(budgetUSD);
     document.getElementById('b-owner').textContent=ownerTAO+' TAO';
-    document.getElementById('b-owner-sub').textContent='$'+fK(ownerUSD)+' · 1,296α';
+    document.getElementById('b-owner-sub').textContent='$'+fK(ownerUSD)+' · '+Math.round(ownerAlphaDay).toLocaleString()+'α';
     document.getElementById('b-yield').textContent='—';
 
     // --- Delegations: use ISO date slice(0,10) ---
@@ -252,7 +252,7 @@ async function loadAll(){
     });
     const netFlow=tBuy-tSell;
     const cfPrice=tip/((alphaIn/RAO)-Math.max(tSell,0.001));
-    const cfOwner=+(1296*cfPrice).toFixed(3),taoLost=+(cfOwner-ownerTAO).toFixed(3);
+    const cfOwner=+(ownerAlphaDay*cfPrice).toFixed(3),taoLost=+(cfOwner-ownerTAO).toFixed(3);
 
     document.getElementById('k-sell').textContent=f1(tSell)+'α';
     document.getElementById('k-sell-sub').textContent=Object.values(byW).filter(w=>w.sold>0).length+' wallets unstaking';
