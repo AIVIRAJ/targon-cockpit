@@ -223,20 +223,20 @@ async function loadAll(){
     const dailyPayout=totalHourly*24;
 
     // --- Burn ---
-    const emPool=d.emission_pool,dailyAlpha=emPool*20,minerBudget=dailyAlpha*0.41,ownerAlphaDay=dailyAlpha*0.18;
+    const emPool=d.emission_pool,minerBudget=2952,ownerAlphaDay=1296;
     const budgetUSD=minerBudget*ap*tp;
     const burnRate=(budgetUSD-dailyPayout)/budgetUSD*100;
     const ownerTAO=+(ownerAlphaDay*ap).toFixed(2),ownerUSD=+(ownerTAO*tp).toFixed(0);
 
     document.getElementById('b-budget').textContent='$'+fK(budgetUSD);
-    document.getElementById('b-budget-sub').textContent=Math.round(minerBudget).toLocaleString()+'α × Ⱥ'+ap.toFixed(4);
+    document.getElementById('b-budget-sub').textContent='2,952α × Ⱥ'+ap.toFixed(4);
     document.getElementById('b-payout').textContent='$'+fK(dailyPayout);
     document.getElementById('b-payout-sub').textContent='$'+f1(totalHourly)+'/hr · '+totalCards+' cards';
     document.getElementById('b-burn').textContent=f1(burnRate)+'%';
     document.getElementById('b-burn-sub').textContent='$'+fK(budgetUSD-dailyPayout)+'/day unspent';
     document.getElementById('b-max').textContent='$'+fK(budgetUSD);
     document.getElementById('b-owner').textContent=ownerTAO+' TAO';
-    document.getElementById('b-owner-sub').textContent='$'+fK(ownerUSD)+' · '+Math.round(ownerAlphaDay).toLocaleString()+'α';
+    document.getElementById('b-owner-sub').textContent='$'+fK(ownerUSD)+' · 1,296α';
     document.getElementById('b-yield').textContent='—';
 
     // --- Delegations: use ISO date slice(0,10) ---
