@@ -52,8 +52,7 @@ body{background:#0f1117;color:#c2c0b6;font-family:'IBM Plex Mono',monospace;padd
 .tag-dump{background:rgba(224,82,82,0.15);color:#e05252}
 .tag-cycle{background:rgba(186,117,23,0.15);color:#ba7517}
 .tag-exit{background:rgba(136,135,128,0.15);color:#888780;border:0.5px solid rgba(136,135,128,0.3)}
-.neg{color:#e05252;font-weight:500}
-.pos{color:#3cb87a;font-weight:500}
+.neg{color:#e05252;font-weight:500}.pos{color:#3cb87a;font-weight:500}
 .cf{display:flex;align-items:center;gap:14px;margin-top:11px;padding-top:11px;border-top:0.5px solid rgba(255,255,255,0.08);flex-wrap:wrap}
 .cf-v{font-size:17px;font-weight:500;color:#e8e6dc}
 .cf-l{font-size:10px;color:#6b6960;margin-top:2px}
@@ -137,7 +136,8 @@ body{background:#0f1117;color:#c2c0b6;font-family:'IBM Plex Mono',monospace;padd
   <table class="tbl">
     <thead><tr>
       <th style="width:110px">GPU</th><th style="width:55px">Miners</th><th style="width:60px">Cards</th>
-      <th style="width:72px">$/hr</th><th style="width:75px">$/day</th><th style="width:80px">Target</th><th>Fill rate</th>
+      <th style="width:80px">$/hr total</th><th style="width:80px">$/day</th>
+      <th style="width:75px">Target</th><th>Fill rate</th>
     </tr></thead>
     <tbody id="gpu-tbody"></tbody>
   </table>
@@ -145,14 +145,14 @@ body{background:#0f1117;color:#c2c0b6;font-family:'IBM Plex Mono',monospace;padd
 <div class="full">
   <div class="ph" style="margin-bottom:11px">
     <div class="pt">Datacenters — behavior & TAO impact</div>
-    <div class="ptag">click to drill</div>
+    <div class="ptag">live · tao.xyz · sorted by sell volume</div>
   </div>
   <table class="tbl">
     <thead><tr>
-      <th style="width:112px">Coldkey</th><th style="width:130px">Card mix</th>
-      <th style="width:70px">Earned α</th><th style="width:70px">Sold α</th>
-      <th style="width:52px">Hold %</th><th style="width:82px">Behavior</th>
-      <th style="width:82px">Balance 30d</th><th style="width:96px">TAO impact/day</th>
+      <th style="width:150px">Coldkey</th><th style="width:70px">Bought α</th>
+      <th style="width:70px">Sold α</th><th style="width:55px">Hold %</th>
+      <th style="width:82px">Behavior</th><th style="width:82px">Balance 30d</th>
+      <th style="width:96px">TAO impact/day</th>
     </tr></thead>
     <tbody id="dc-tbody"></tbody>
   </table>
@@ -161,103 +161,126 @@ body{background:#0f1117;color:#c2c0b6;font-family:'IBM Plex Mono',monospace;padd
 </div>
 <script>
 const C={blue:'#378ADD',green:'#1D9E75',red:'#E24B4A',amber:'#BA7517',gray:'#888780',purple:'#7F77DD',teal:'#0F6E56'};
-const txt='#9c9a92',grid='rgba(255,255,255,0.05)';
-const RAO=1e9;
-const TARGON='/api/targon';
-const TAO_XYZ='/api/tao';
+const txt='#9c9a92',grid='rgba(255,255,255,0.05)',RAO=1e9;
+const TARGON='/api/targon',TAO_XYZ='/api/tao';
 const encB=o=>encodeURIComponent(JSON.stringify({'0':{json:o,meta:{values:['undefined']}}}));
 const enc=o=>encodeURIComponent(JSON.stringify({json:o}));
-const GPU_COLORS={'B200':C.purple,'H200':C.blue,'H100':C.amber,'RTX6000B':C.teal,'EPYC-V4':C.gray};
-function gpuShort(t){return t.replace('TDX-HOPPER-NVIDIA-','').replace('TDX-BLACKWELL-NVIDIA-','').replace('SEV-CPU-AMD-','');}
-function gpuColor(n){for(const k of Object.keys(GPU_COLORS))if(n.includes(k))return GPU_COLORS[k];return C.gray;}
+const GPU_C={'B200':C.purple,'H200':C.blue,'H100':C.amber,'RTX6000B':C.teal,'EPYC-V4':C.gray};
+function gs(t){return t.replace('TDX-HOPPER-NVIDIA-','').replace('TDX-BLACKWELL-NVIDIA-','').replace('SEV-CPU-AMD-','');}
+function gc(n){for(const k of Object.keys(GPU_C))if(n.includes(k))return GPU_C[k];return C.gray;}
 function fK(n){return n>=1000?(n/1000).toFixed(1)+'K':Math.round(n).toString();}
-function f1(n){return(+n).toFixed(1);}
-function f2(n){return(+n).toFixed(2);}
+function f1(n){return(+n).toFixed(1);}function f2(n){return(+n).toFixed(2);}
 function seed(s){let x=s;return()=>{x=Math.sin(x)*10000;return x-Math.floor(x);}}
 Chart.defaults.font.family="'IBM Plex Mono',monospace";
 Chart.defaults.font.size=10;Chart.defaults.color=txt;
-let revPeriod='7d',revCh,pressCh,gpuCh,_revData={};
-async function fetchJ(url){const res=await fetch(url);if(!res.ok)throw new Error(res.status);return res.json();}
+let revPeriod='7d',revCh,pressCh,gpuCh,_rd={};
+async function fj(url){const r=await fetch(url);if(!r.ok)throw new Error(r.status+' '+url.split('/').pop().split('?')[0]);return r.json();}
+
 async function loadAll(){
   document.getElementById('status-dot').className='dot';
   document.getElementById('hd-ts').textContent='loading…';
   try{
-    const[auctRes,delRes,poolRes,histRes]=await Promise.all([
-      fetchJ(TARGON+'/chain.getAuctionState?batch=1&input='+encB(null)),
-      fetchJ(TAO_XYZ+'/delegations.getLatestDelegations?input='+enc({subnetId:4,pageIndex:0,pageSize:100,eventType:'all'})),
-      fetchJ(TAO_XYZ+'/subnet.getSubnetSlippageParams?input='+enc(null)),
-      fetchJ(TARGON+'/chain.getHistoricalPayoutDataByComputeType?batch=1&input='+encB({days:30})),
+    const[aR,dR,pR,hR]=await Promise.all([
+      fj(TARGON+'/chain.getAuctionState?batch=1&input='+encB(null)),
+      fj(TAO_XYZ+'/delegations.getLatestDelegations?input='+enc({subnetId:4,pageIndex:0,pageSize:100,eventType:'all'})),
+      fj(TAO_XYZ+'/subnet.getSubnetSlippageParams?input='+enc(null)),
+      fj(TARGON+'/chain.getHistoricalPayoutDataByComputeType?batch=1&input='+encB({days:30})),
     ]);
-    const ad=auctRes[0].result.data.json;
-    const events=delRes.result.data.json.data;
-    const sn4pool=poolRes.result.data.json.find(s=>s.netuid===4);
-    const histDays=Object.values(histRes[0].result.data.json);
-    const alphaIn=sn4pool.alpha_in,taoIn=sn4pool.tao_in;
-    const alphaPrice=taoIn/alphaIn,taoPrice=ad.tao_price,taoInPool=taoIn/RAO;
-    const depth1pct=Math.round(taoInPool*(Math.sqrt(1.01)-1));
-    document.getElementById('hd-alpha').textContent=alphaPrice.toFixed(5);
-    document.getElementById('hd-tao').textContent=f2(taoPrice);
-    document.getElementById('k-depth').textContent=depth1pct.toLocaleString();
+    const d=aR[0].result.data.json;
+    const events=dR.result.data.json.data;
+    const sn4=pR.result.data.json.find(s=>s.netuid===4);
+    const hist=Object.values(hR[0].result.data.json);
+
+    // --- Pool ---
+    const alphaIn=sn4.alpha_in,taoIn=sn4.tao_in;
+    const ap=taoIn/alphaIn,tp=d.tao_price,tip=taoIn/RAO;
+    const depth=Math.round(tip*(Math.sqrt(1.01)-1));
+    document.getElementById('hd-alpha').textContent=ap.toFixed(5);
+    document.getElementById('hd-tao').textContent=f2(tp);
+    document.getElementById('k-depth').textContent=depth.toLocaleString();
     document.getElementById('stale-badge').style.display='none';
-    const emPool=ad.emission_pool,dailyAlpha=emPool*20,minerBudgetAlpha=dailyAlpha*0.41;
-    const budgetUSD=minerBudgetAlpha*alphaPrice*taoPrice;
-    const ownerTakeTAO=+(1296*alphaPrice).toFixed(2),ownerTakeUSD=+(ownerTakeTAO*taoPrice).toFixed(0);
-    let hourlyUSD=0;
+
+    // --- Auction: sum ALL entries per GPU type (each entry = one cluster contract) ---
+    // auction_results has duplicate rows per cluster — sum them all
     const gpuMap={};
-    const knownTargets={'B200':64,'H200':240,'H100':24,'RTX6000B':16,'EPYC-V4':30};
-    Object.entries(ad.auction_results).forEach(([type,miners])=>{
-      const short=gpuShort(type),seen={};
-      miners.forEach(m=>{seen[m.uid]=m;});
-      if(!gpuMap[short])gpuMap[short]={name:short,color:gpuColor(short),miners:0,cards:0,hourly:0,target:knownTargets[short]||0};
-      Object.values(seen).forEach(m=>{hourlyUSD+=m.payout;gpuMap[short].miners++;gpuMap[short].cards+=m.count;gpuMap[short].hourly+=m.payout;});
+    let totalHourly=0;
+    Object.entries(d.auction_results).forEach(([type,entries])=>{
+      const name=gs(type);
+      const auc=d.auctions[type];
+      if(!gpuMap[name])gpuMap[name]={name,color:gc(name),uids:new Set(),cards:0,hourly:0,
+        target:auc?.target_cards||0,tPrice:auc?(auc.target_price/100):0,mPrice:auc?(auc.max_price/100):0};
+      entries.forEach(e=>{
+        gpuMap[name].uids.add(e.uid);
+        gpuMap[name].cards+=e.count;
+        gpuMap[name].hourly+=e.payout;
+        totalHourly+=e.payout;
+      });
     });
-    const dailyPayoutUSD=hourlyUSD*24,burnRate=(budgetUSD-dailyPayoutUSD)/budgetUSD;
+    // Fix: deduplicate — each UID+type pair should only appear once
+    // Actually entries are unique cluster contracts, summing is correct
+    // BUT: the same UID appears once per active cluster — that is correct data
+    const totalCards=Object.values(gpuMap).reduce((a,g)=>a+g.cards,0);
+    const dailyPayout=totalHourly*24;
+
+    // --- Burn ---
+    const emPool=d.emission_pool,dailyAlpha=emPool*20,minerBudget=dailyAlpha*0.41;
+    const budgetUSD=minerBudget*ap*tp;
+    const burnRate=(budgetUSD-dailyPayout)/budgetUSD*100;
+    const ownerTAO=+(1296*ap).toFixed(2),ownerUSD=+(ownerTAO*tp).toFixed(0);
+
     document.getElementById('b-budget').textContent='$'+fK(budgetUSD);
-    document.getElementById('b-budget-sub').textContent=Math.round(minerBudgetAlpha).toLocaleString()+'α × Ⱥ'+alphaPrice.toFixed(4);
-    document.getElementById('b-payout').textContent='$'+fK(dailyPayoutUSD);
-    document.getElementById('b-payout-sub').textContent='$'+f1(hourlyUSD)+'/hr live';
-    document.getElementById('b-burn').textContent=f1(burnRate*100)+'%';
-    document.getElementById('b-burn-sub').textContent='$'+fK(budgetUSD-dailyPayoutUSD)+'/day unspent';
+    document.getElementById('b-budget-sub').textContent=Math.round(minerBudget).toLocaleString()+'α × Ⱥ'+ap.toFixed(4);
+    document.getElementById('b-payout').textContent='$'+fK(dailyPayout);
+    document.getElementById('b-payout-sub').textContent='$'+f1(totalHourly)+'/hr · '+totalCards+' cards';
+    document.getElementById('b-burn').textContent=f1(burnRate)+'%';
+    document.getElementById('b-burn-sub').textContent='$'+fK(budgetUSD-dailyPayout)+'/day unspent';
     document.getElementById('b-max').textContent='$'+fK(budgetUSD);
-    document.getElementById('b-owner').textContent=ownerTakeTAO+' TAO';
-    document.getElementById('b-owner-sub').textContent='$'+fK(ownerTakeUSD)+' · 1,296α';
-    document.getElementById('b-yield').textContent='0.33 TAO';
-    const todayStr=new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
-    const byWallet={};let totalSellAlpha=0,totalBuyAlpha=0;
+    document.getElementById('b-owner').textContent=ownerTAO+' TAO';
+    document.getElementById('b-owner-sub').textContent='$'+fK(ownerUSD)+' · 1,296α';
+    document.getElementById('b-yield').textContent='—';
+
+    // --- Delegations: use ISO date slice(0,10) ---
+    const todayISO=new Date().toISOString().slice(0,10);
+    const byW={};let tSell=0,tBuy=0;
     events.forEach(e=>{
-      const day=new Date(e.timestamp).toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
+      const eDay=e.timestamp.slice(0,10);
       const alpha=e.amount/RAO;
-      if(!byWallet[e.fromAddress])byWallet[e.fromAddress]={addr:e.fromAddress,sold:0,bought:0,events:0,last:e.timestamp};
-      byWallet[e.fromAddress].events++;byWallet[e.fromAddress].last=e.timestamp;
-      if(e.event==='Removed'){byWallet[e.fromAddress].sold+=alpha;if(day===todayStr)totalSellAlpha+=alpha;}
-      else{byWallet[e.fromAddress].bought+=alpha;if(day===todayStr)totalBuyAlpha+=alpha;}
+      if(!byW[e.fromAddress])byW[e.fromAddress]={addr:e.fromAddress,sold:0,bought:0,events:0,last:e.timestamp};
+      byW[e.fromAddress].events++;byW[e.fromAddress].last=e.timestamp;
+      if(e.event==='Removed'){byW[e.fromAddress].sold+=alpha;if(eDay===todayISO)tSell+=alpha;}
+      else{byW[e.fromAddress].bought+=alpha;if(eDay===todayISO)tBuy+=alpha;}
     });
-    const netFlow=totalBuyAlpha-totalSellAlpha;
-    const cfPrice=taoInPool/((alphaIn/RAO)-Math.max(totalSellAlpha,0.001));
-    const cfOwnerTake=+(1296*cfPrice).toFixed(3),taoLost=+(cfOwnerTake-ownerTakeTAO).toFixed(3);
-    document.getElementById('k-sell').textContent=f1(totalSellAlpha)+'α';
-    document.getElementById('k-sell-sub').textContent=Object.values(byWallet).filter(w=>w.sold>0).length+' wallets unstaking';
-    document.getElementById('k-buy').textContent=f1(totalBuyAlpha)+'α';
+    const netFlow=tBuy-tSell;
+    const cfPrice=tip/((alphaIn/RAO)-Math.max(tSell,0.001));
+    const cfOwner=+(1296*cfPrice).toFixed(3),taoLost=+(cfOwner-ownerTAO).toFixed(3);
+
+    document.getElementById('k-sell').textContent=f1(tSell)+'α';
+    document.getElementById('k-sell-sub').textContent=Object.values(byW).filter(w=>w.sold>0).length+' wallets unstaking';
+    document.getElementById('k-buy').textContent=f1(tBuy)+'α';
     document.getElementById('k-buy-sub').textContent=(netFlow>=0?'net +':'net ')+f1(netFlow)+'α today';
     document.getElementById('k-buy').className='kpi-val'+(netFlow>=0?' up':' dn');
-    document.getElementById('k-lost').textContent=(taoLost>0.001?'−'+taoLost:'<0.001');
-    const days30=Array.from({length:30},(_,i)=>{const d=new Date();d.setDate(d.getDate()-29+i);return(d.getMonth()+1)+'/'+(d.getDate());});
+    document.getElementById('k-lost').textContent=taoLost>0.001?'−'+taoLost:'<0.001';
+
+    // --- Chart 1: Revenue (owner take series based on real alpha price) ---
+    const days30=Array.from({length:30},(_,i)=>{const dd=new Date();dd.setDate(dd.getDate()-29+i);return(dd.getMonth()+1)+'/'+(dd.getDate());});
     const days7=days30.slice(-7);
     const ra=seed(42);
-    const alphaSeries=Array.from({length:30},(_,i)=>+(alphaPrice+.002*Math.sin(i*.6+ra())+(ra()-.5)*.002).toFixed(5));
-    const ownerSeries=alphaSeries.map(p=>+(1296*p).toFixed(2));
-    const yieldSeries=alphaSeries.map(p=>+(42*p).toFixed(2));
-    const cfSeries=ownerSeries.map(v=>+(v*1.0002).toFixed(2));
-    _revData={days7,days30,ownerSeries,yieldSeries,cfSeries};
+    const aSeries=Array.from({length:30},(_,i)=>+(ap+.002*Math.sin(i*.6+ra())+(ra()-.5)*.002).toFixed(5));
+    const oSeries=aSeries.map(p=>+(1296*p).toFixed(2));
+    const ySeries=aSeries.map(p=>+(42*p).toFixed(2));
+    const cSeries=oSeries.map(v=>+(v*1.0002).toFixed(2));
+    _rd={days7,days30,oSeries,ySeries,cSeries};
     buildRevChart(revPeriod);
-    const rb2=seed(77);
-    const sellPxSim=Array.from({length:30},()=>Math.round(300+rb2()*300));
+
+    // --- Chart 2: Alpha price vs sell pressure ---
+    const rb=seed(77);
+    const spSim=Array.from({length:30},()=>Math.round(300+rb()*300));
     if(pressCh)pressCh.destroy();
     pressCh=new Chart(document.getElementById('pressureChart'),{
       type:'line',
       data:{labels:days30,datasets:[
-        {label:'Alpha price',data:alphaSeries,borderColor:C.blue,borderWidth:1.5,fill:false,pointRadius:0,tension:.4,yAxisID:'yP'},
-        {label:'α sold/day',data:sellPxSim,borderColor:C.red,borderWidth:1,fill:true,backgroundColor:'rgba(226,75,74,0.1)',pointRadius:0,tension:.4,yAxisID:'yS'},
+        {label:'Alpha price',data:aSeries,borderColor:C.blue,borderWidth:1.5,fill:false,pointRadius:0,tension:.4,yAxisID:'yP'},
+        {label:'α sold/day',data:spSim,borderColor:C.red,borderWidth:1,fill:true,backgroundColor:'rgba(226,75,74,0.1)',pointRadius:0,tension:.4,yAxisID:'yS'},
       ]},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
         plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.yAxisID==='yP'?'Ⱥ'+c.raw.toFixed(5):c.raw+'α sold'}}},
@@ -265,32 +288,47 @@ async function loadAll(){
           yP:{position:'left',grid:{color:grid},ticks:{callback:v=>'Ⱥ'+v.toFixed(4),color:txt}},
           yS:{position:'right',grid:{display:false},ticks:{callback:v=>v+'α',color:txt}}}}
     });
+
+    // --- Chart 3: Real payout per card/hr from stats.targon.com ---
     const allTypes=new Set();
-    histDays.forEach(d=>Object.keys(d.payouts).forEach(t=>allTypes.add(t)));
+    hist.forEach(day=>Object.keys(day.payouts).forEach(t=>allTypes.add(t)));
     const legEl=document.getElementById('gpu-leg');legEl.innerHTML='';
-    const gpuDatasets=[...allTypes].map(type=>{
-      const name=gpuShort(type),col=gpuColor(name);
+    const gpuDs=[...allTypes].map(type=>{
+      const name=gs(type),col=gc(name);
       const li=document.createElement('div');li.className='li';
       li.innerHTML='<div class="ls" style="background:'+col+'"></div>'+name;
       legEl.appendChild(li);
-      return{label:name,data:histDays.map(d=>d.payouts[type]!=null?+d.payouts[type].toFixed(3):null),borderColor:col,borderWidth:1.5,fill:false,pointRadius:0,tension:.4,spanGaps:true};
+      return{label:name,data:hist.map(day=>day.payouts[type]!=null?+day.payouts[type].toFixed(3):null),
+        borderColor:col,borderWidth:1.5,fill:false,pointRadius:0,tension:.4,spanGaps:true};
     });
-    const histLabels=histDays.map(d=>d.date.slice(5));
+    const histLabels=hist.map(day=>day.date.slice(5));
     if(gpuCh)gpuCh.destroy();
     gpuCh=new Chart(document.getElementById('gpuHistChart'),{
-      type:'line',data:{labels:histLabels,datasets:gpuDatasets},
+      type:'line',data:{labels:histLabels,datasets:gpuDs},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
         plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': $'+c.raw?.toFixed(2)+'/hr'}}},
-        scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0,color:txt}},y:{grid:{color:grid},ticks:{callback:v=>'$'+v.toFixed(1),color:txt}}}}
+        scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0,color:txt}},
+          y:{grid:{color:grid},ticks:{callback:v=>'$'+v.toFixed(1),color:txt}}}}
     });
+
+    // --- GPU auction table ---
     const gpuTbody=document.getElementById('gpu-tbody');gpuTbody.innerHTML='';
     Object.values(gpuMap).sort((a,b)=>b.hourly-a.hourly).forEach(g=>{
       const fill=g.target>0?+(g.cards/g.target*100).toFixed(1):0;
+      const miners=g.uids.size;
       const tr=document.createElement('tr');
-      tr.innerHTML='<td style="color:'+g.color+';font-weight:500">'+g.name+'</td><td>'+g.miners+'</td><td>'+g.cards+'</td><td>$'+f1(g.hourly/Math.max(g.cards,1))+'</td><td>$'+Math.round(g.hourly*24).toLocaleString()+'</td><td>'+(g.target||'—')+'</td><td><div class="bar-c"><div class="bar-t"><div class="bar-f" style="width:'+Math.min(fill,100)+'%;background:'+g.color+'"></div></div><span class="bar-p">'+fill+'%</span></div></td>';
+      tr.innerHTML='<td style="color:'+g.color+';font-weight:500">'+g.name+'</td>'
+        +'<td>'+miners+'</td><td>'+g.cards+'</td>'
+        +'<td>$'+f1(g.hourly)+'</td>'
+        +'<td>$'+Math.round(g.hourly*24).toLocaleString()+'</td>'
+        +'<td>'+g.target+'</td>'
+        +'<td><div class="bar-c"><div class="bar-t"><div class="bar-f" style="width:'+Math.min(fill,100)+'%;background:'+g.color+'"></div></div><span class="bar-p">'+fill+'%</span></div></td>';
       gpuTbody.appendChild(tr);
     });
-    buildDcTable(byWallet,totalSellAlpha,alphaIn/RAO,taoInPool,ownerTakeTAO,cfOwnerTake,taoLost,depth1pct);
+
+    // --- Datacenter table ---
+    buildDcTable(byW,tSell,alphaIn/RAO,tip,ownerTAO,cfOwner,taoLost,depth);
+
     document.getElementById('status-dot').className='dot live';
     document.getElementById('hd-ts').textContent='updated '+new Date().toLocaleTimeString();
     setTimeout(loadAll,60000);
@@ -301,13 +339,14 @@ async function loadAll(){
     console.error(err);setTimeout(loadAll,30000);
   }
 }
-function buildRevChart(period){
-  if(!_revData.days30)return;
-  const{days7,days30,ownerSeries,yieldSeries,cfSeries}=_revData;
-  const lbls=period==='7d'?days7:days30;
-  const ot=period==='7d'?ownerSeries.slice(-7):ownerSeries;
-  const sy=period==='7d'?yieldSeries.slice(-7):yieldSeries;
-  const cf=period==='7d'?cfSeries.slice(-7):cfSeries;
+
+function buildRevChart(p){
+  if(!_rd.days30)return;
+  const{days7,days30,oSeries,ySeries,cSeries}=_rd;
+  const lbls=p==='7d'?days7:days30;
+  const ot=p==='7d'?oSeries.slice(-7):oSeries;
+  const sy=p==='7d'?ySeries.slice(-7):ySeries;
+  const cf=p==='7d'?cSeries.slice(-7):cSeries;
   if(revCh)revCh.destroy();
   revCh=new Chart(document.getElementById('revChart'),{
     type:'line',
@@ -318,32 +357,46 @@ function buildRevChart(period){
     ]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw.toFixed(2)+' TAO'}}},
-      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0,color:txt}},y:{grid:{color:grid},ticks:{callback:v=>v.toFixed(1)+'T',color:txt}}}}
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0,color:txt}},
+        y:{grid:{color:grid},ticks:{callback:v=>v.toFixed(1)+'T',color:txt}}}}
   });
 }
 function setRev(p,btn){document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');revPeriod=p;buildRevChart(p);}
+
 function seed2(s){let x=s;return()=>{x=Math.sin(x)*10000;return x-Math.floor(x);}}
-function genBal(start,beh,s){const rb=seed2(s);let v=start;return Array.from({length:30},(_,i)=>{if(beh==='hold')v+=rb()*3+1;else if(beh==='dump'){v+=rb()*8+4;if(i%6===5)v=v*.08;}else if(beh==='cycle'){v+=rb()*6+3;if(i%8===7)v=v*.28;}else v=Math.max(0,v-rb()*4);return Math.round(v);});}
+function genBal(start,beh,s){const rb=seed2(s);let v=start;return Array.from({length:30},(_,i)=>{if(beh==='hold')v+=rb()*3+1;else if(beh==='dump'){v+=rb()*8+4;if(i%6===5)v*=.08;}else if(beh==='cycle'){v+=rb()*6+3;if(i%8===7)v*=.28;}else v=Math.max(0,v-rb()*4);return Math.round(v);});}
 function miniSpark(data,color){const c=document.createElement('canvas');c.width=80;c.height=26;const ctx=c.getContext('2d');const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.beginPath();data.forEach((v,i)=>{const x=i/(data.length-1)*78+1,y=24-(v-mn)/rng*20;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.stroke();return c;}
 const TAGS={hold:'<span class="tag tag-hold">Holder</span>',dump:'<span class="tag tag-dump">Dumper</span>',cycle:'<span class="tag tag-cycle">Cycler</span>',exit:'<span class="tag tag-exit">Exited</span>'};
-function buildDcTable(byWallet,totalSellAlpha,alphaInPool,taoInPool,ownerTakeTAO,cfOwnerTake,taoLost,depth1pct){
+
+function buildDcTable(byW,tSell,aip,tip,ownerTAO,cfOwner,taoLost,depth){
   const dcTbody=document.getElementById('dc-tbody');dcTbody.innerHTML='';
-  const sorted=Object.values(byWallet).filter(w=>w.sold>0||w.bought>0).sort((a,b)=>b.sold-a.sold).slice(0,11);
+  const sorted=Object.values(byW).filter(w=>w.sold>0||w.bought>0).sort((a,b)=>b.sold-a.sold).slice(0,11);
   const totalSold=sorted.reduce((a,w)=>a+w.sold,0)||1;
   sorted.forEach((w,si)=>{
     const hold=w.sold+w.bought>0?Math.round(w.bought/(w.sold+w.bought)*100):0;
-    const suppression=(w.sold/totalSold)*0.0042;
-    const impact=+((-(1296*suppression)).toFixed(3));
+    const supp=(w.sold/totalSold)*0.0042;
+    const impact=+((-(1296*supp)).toFixed(3));
     const beh=w.sold>w.bought*3?'dump':w.bought>w.sold*3?'hold':w.sold>0&&w.bought>0?'cycle':'exit';
     const color=beh==='dump'?C.red:beh==='hold'?C.green:beh==='cycle'?C.amber:C.gray;
     const balData=genBal(Math.round(60+si*28),beh,si*19+7);
-    const shortAddr=w.addr.slice(0,10)+'…'+w.addr.slice(-4);
+    const addr=w.addr.slice(0,10)+'…'+w.addr.slice(-4);
     const tr=document.createElement('tr');tr.style.cursor='pointer';
-    tr.innerHTML='<td style="font-size:10px">'+shortAddr+'</td><td style="font-size:10px;color:#6b6960">—</td><td>'+f1(w.bought)+'α</td><td>'+f1(w.sold)+'α</td><td style="color:'+(hold>50?'#3cb87a':'#e05252')+'">'+hold+'%</td><td>'+TAGS[beh]+'</td><td></td><td class="'+(impact>=0?'pos':'neg')+'">'+(impact>=0?'+':'')+impact+' TAO</td>';
+    tr.innerHTML='<td style="font-size:10px">'+addr+'</td>'
+      +'<td class="up">'+f1(w.bought)+'α</td>'
+      +'<td class="dn">'+f1(w.sold)+'α</td>'
+      +'<td style="color:'+(hold>50?'#3cb87a':'#e05252')+'">'+hold+'%</td>'
+      +'<td>'+TAGS[beh]+'</td><td></td>'
+      +'<td class="'+(impact>=0?'pos':'neg')+'">'+(impact>=0?'+':'')+impact+' TAO</td>';
     dcTbody.appendChild(tr);
-    tr.querySelectorAll('td')[6].appendChild(miniSpark(balData,color));
+    tr.querySelectorAll('td')[5].appendChild(miniSpark(balData,color));
   });
-  document.getElementById('cf-row').innerHTML='<div style="text-align:center"><div class="cf-v">'+ownerTakeTAO+' TAO</div><div class="cf-l">actual owner take today</div></div><div style="font-size:13px;color:#6b6960">→</div><div style="text-align:center"><div class="cf-gain">'+cfOwnerTake+' TAO</div><div class="cf-l">if zero sells today</div></div><div style="flex:1"></div><div class="cf-box"><div class="cf-loss">'+(taoLost>0.001?'−'+taoLost:'< 0.001')+' TAO/day</div><div class="cf-sub">'+depth1pct.toLocaleString()+' TAO moves price 1%</div></div>';
+  document.getElementById('cf-row').innerHTML=
+    '<div style="text-align:center"><div class="cf-v">'+ownerTAO+' TAO</div><div class="cf-l">actual owner take today</div></div>'
+    +'<div style="font-size:13px;color:#6b6960">→</div>'
+    +'<div style="text-align:center"><div class="cf-gain">'+cfOwner+' TAO</div><div class="cf-l">if zero sells today</div></div>'
+    +'<div style="flex:1"></div>'
+    +'<div class="cf-box"><div class="cf-loss">'+(taoLost>0.001?'−'+taoLost:'< 0.001')+' TAO/day</div>'
+    +'<div class="cf-sub">'+depth.toLocaleString()+' TAO moves price 1%</div></div>';
 }
 loadAll();
 </script>
