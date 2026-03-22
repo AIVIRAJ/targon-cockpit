@@ -229,8 +229,10 @@ async function loadAll(){
     // --- Burn ---
     const emPool=d.emission_pool,minerBudget=2952,ownerAlphaDay=1296;
     const budgetUSD=minerBudget*ap*tp;
+    const netAllocAlpha=minerBudget*(1-incentiveBurn);
+    const netAllocUSD=netAllocAlpha*ap*tp;
     const burnRate=incentiveBurn*100;
-    const utilRate=dailyPayout/netAllocUSD*100;
+    const utilRate=netAllocUSD>0?dailyPayout/netAllocUSD*100:0;
     const ownerTAO=+(ownerAlphaDay*ap).toFixed(2),ownerUSD=+(ownerTAO*tp).toFixed(0);
 
     document.getElementById('b-budget').textContent='$'+fK(budgetUSD);
@@ -239,11 +241,8 @@ async function loadAll(){
     document.getElementById('b-payout-sub').textContent='$'+f1(totalHourly)+'/hr · '+totalCards+' cards';
     document.getElementById('b-burn').textContent=f1(burnRate)+'%';
     document.getElementById('b-burn-sub').textContent=f1(utilRate)+'% of net utilized';
-    const netAllocAlpha=minerBudget*(1-incentiveBurn);
-    const netAllocUSD=netAllocAlpha*ap*tp;
-    const utilPct=dailyPayout/netAllocUSD*100;
     document.getElementById('b-net').textContent='$'+fK(netAllocUSD);
-    document.getElementById('b-net-sub').textContent=Math.round(netAllocAlpha).toLocaleString()+'α · burn '+f1(incentiveBurn*100)+'%';
+    document.getElementById('b-net-sub').textContent=Math.round(netAllocAlpha).toLocaleString()+'α · burn '+f1(burnRate)+'%';
     document.getElementById('b-owner').textContent=ownerTAO+' TAO';
     document.getElementById('b-owner-sub').textContent='$'+fK(ownerUSD)+' · 1,296α';
     document.getElementById('b-yield').textContent='—';
