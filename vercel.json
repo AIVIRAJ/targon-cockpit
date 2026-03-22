@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/tao/:path*", "destination": "https://tao.xyz/api/trpc/:path*" }
+    { "source": "/api/tao/:path*", "destination": "https://tao.xyz/api/trpc/:path*" },
+    { "source": "/api/targon/:path*", "destination": "https://stats.targon.com/api/trpc/:path*" }
   ]
 }
