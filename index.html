@@ -186,7 +186,7 @@ async function loadAll(){
       fj(TAO_XYZ+'/subnet.getSubnetSlippageParams?input='+enc(null)),
       fj(TARGON+'/chain.getHistoricalPayoutDataByComputeType?batch=1&input='+encB({days:30})),
       fj('https://taostats.io/api/subnet/subnet?netuid=4'),
-      fj(TAO_XYZ+'/wallet.getHistoricalBalance?input='+enc({wallet:'5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv',currency:'alpha',netuid:4})),
+      fj('/api/taostats?path=dtao/stake_balance/history/v1&coldkey=5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv&netuid=4&limit=8&order=desc'),
     ]);
     const d=aR[0].result.data.json;
     const events=dR.result.data.json.data;
@@ -194,12 +194,14 @@ async function loadAll(){
     const hist=Object.values(hR[0].result.data.json);
     const incentiveBurn=parseFloat(tsR.data?.[0]?.incentive_burn||0);
     // Wallet staking yield: 24h delta in alpha
-    const wBal=wR.result.data.json;
-    const wFirst=wBal[0],wLast=wBal[wBal.length-1];
-    const wSpanH=(wLast.timestamp-wFirst.timestamp)/(3600*1000);
-    const wDelta=wLast.balance-wFirst.balance;
+    const wRows=(wR.data||[]).slice().reverse(); // oldest first
+    const wFirst=wRows[0],wLast=wRows[wRows.length-1];
+    const wFirstBal=wFirst?parseInt(wFirst.balance)/1e9:0;
+    const wLastBal=wLast?parseInt(wLast.balance)/1e9:0;
+    const wSpanH=wFirst&&wLast?(new Date(wLast.timestamp)-new Date(wFirst.timestamp))/(3600*1000):0;
+    const wDelta=wLastBal-wFirstBal;
     const yieldPerDay=wSpanH>0?wDelta/(wSpanH/24):0;
-    const apyPct=wLast.balance>0?yieldPerDay*365/wLast.balance*100:0;
+    const apyPct=wLastBal>0?yieldPerDay*365/wLastBal*100:0;
 
     // --- Pool ---
     const alphaIn=sn4.alpha_in,taoIn=sn4.tao_in;
@@ -252,7 +254,7 @@ async function loadAll(){
     document.getElementById('b-net').textContent='$'+fK(netAllocUSD);
     document.getElementById('b-net-sub').textContent=Math.round(netAllocAlpha).toLocaleString()+'α · burn '+f1(burnRate)+'%';
     document.getElementById('b-yield').textContent=f1(yieldPerDay)+'α';
-    document.getElementById('b-yield-sub').textContent='Ⱥ'+wFirst.balance.toFixed(0)+' → '+wLast.balance.toFixed(0)+' ('+f1(wSpanH)+'h)';
+    document.getElementById('b-yield-sub').textContent='Ⱥ'+wFirstBal.toFixed(0)+' → '+wLastBal.toFixed(0)+' ('+f1(wSpanH)+'h)';
     document.getElementById('b-apy').textContent=f1(apyPct)+'%';
     document.getElementById('b-apy-sub').textContent='on '+Math.round(wLast.balance).toLocaleString()+'α staked';
 
