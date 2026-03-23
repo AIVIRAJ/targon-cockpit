@@ -188,7 +188,7 @@ async function loadAll(){
       fj('https://taostats.io/api/subnet/subnet?netuid=4'),
       Promise.all([
       fj('/api/taostats?path=dtao/stake_balance/latest/v1&coldkey=5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv&netuid=4'),
-      fj('/api/taostats?path=dtao/stake_balance/history/v1&coldkey=5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv&hotkey=5Hp18g9P8hLGKp9W3ZDr4bvJwba6b6bY3P2u3VdYf8yMR8FM&netuid=4&limit=2&order=timestamp_desc'),
+      fj('/api/taostats?path=dtao/stake_balance/history/v1&coldkey=5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv&hotkey=5Hp18g9P8hLGKp9W3ZDr4bvJwba6b6bY3P2u3VdYf8yMR8FM&netuid=4&limit=8&order=timestamp_desc'),
     ]),
     ]);
     const d=aR[0].result.data.json;
@@ -210,8 +210,7 @@ async function loadAll(){
     const walletDeltaPerDay=wSpanH>0?(hLastBal-hFirstBal)/(wSpanH/24):0;
     const ownerAlphaPerDay=1296; // 18% of 7200 alpha/day SN owner take
     const yieldPerDay=Math.max(0, walletDeltaPerDay-ownerAlphaPerDay);
-    const wLastBal=wTotalBal; // use total for APY denominator
-    const apyPct=wLastBal>0?yieldPerDay*365/wLastBal*100:0;
+    const apyPct=wTotalBal>0?yieldPerDay*365/wTotalBal*100:0;
 
     // --- Pool ---
     const alphaIn=sn4.alpha_in,taoIn=sn4.tao_in;
@@ -267,7 +266,7 @@ async function loadAll(){
     document.getElementById('b-yield-sub').textContent=f1(walletDeltaPerDay)+'α OW delta − 1,296α owner';
     document.getElementById('b-apy-sub').textContent='on '+Math.round(wTotalBal).toLocaleString()+'α staked';
     document.getElementById('b-apy').textContent=f1(apyPct)+'%';
-    document.getElementById('b-apy-sub').textContent='on '+Math.round(wLastBal).toLocaleString()+'α staked';
+    document.getElementById('b-apy-sub').textContent='on '+Math.round(wTotalBal).toLocaleString()+'α staked';
 
     // --- Delegations: use ISO date slice(0,10) ---
     const todayISO=new Date().toISOString().slice(0,10);
