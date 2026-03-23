@@ -75,12 +75,12 @@ body{background:#0f1117;color:#c2c0b6;font-family:'IBM Plex Mono',monospace;padd
   </div>
 </div>
 <div class="burn-strip">
-  <div class="bs"><div class="bs-lbl">Emission budget/day</div><div class="bs-val" id="b-budget">—</div><div class="bs-sub" id="b-budget-sub">loading…</div></div>
+  <div class="bs"><div class="bs-lbl">Total miner emissions</div><div class="bs-val" id="b-budget">—</div><div class="bs-sub" id="b-budget-sub">loading…</div></div>
+  <div class="bs"><div class="bs-lbl">Protocol burn rate</div><div class="bs-val" id="b-burn" style="color:#e05252">—</div><div class="bs-sub" id="b-burn-sub">—</div></div>
+  <div class="bs"><div class="bs-lbl">Net allocated post-burn</div><div class="bs-val" id="b-net">—</div><div class="bs-sub" id="b-net-sub">—</div></div>
   <div class="bs"><div class="bs-lbl">Actual payout/day</div><div class="bs-val" id="b-payout">—</div><div class="bs-sub" id="b-payout-sub">—</div></div>
-  <div class="bs"><div class="bs-lbl">Burn rate</div><div class="bs-val" id="b-burn" style="color:#3cb87a">—</div><div class="bs-sub" id="b-burn-sub">—</div></div>
-  <div class="bs"><div class="bs-lbl">Net allocated/day</div><div class="bs-val" id="b-net">—</div><div class="bs-sub" id="b-net-sub">after protocol burn</div></div>
-  <div class="bs"><div class="bs-lbl">Owner take/day</div><div class="bs-val" id="b-owner">—</div><div class="bs-sub" id="b-owner-sub">—</div></div>
-  <div class="bs"><div class="bs-lbl">Staking yield/day</div><div class="bs-val" id="b-yield">—</div><div class="bs-sub">wallet Δ − 1,296α</div></div>
+  <div class="bs"><div class="bs-lbl">Staking yield/day</div><div class="bs-val" id="b-yield">—</div><div class="bs-sub" id="b-yield-sub">wallet Δ in α · 24h</div></div>
+  <div class="bs"><div class="bs-lbl">Staking APY</div><div class="bs-val" id="b-apy" style="color:#3cb87a">—</div><div class="bs-sub" id="b-apy-sub">annualised</div></div>
 </div>
 <div class="kpis">
   <div class="kpi"><div class="kpi-lbl">Sell pressure today</div><div class="kpi-val dn" id="k-sell">—</div><div class="kpi-sub" id="k-sell-sub">—</div></div>
@@ -180,18 +180,26 @@ async function loadAll(){
   document.getElementById('status-dot').className='dot';
   document.getElementById('hd-ts').textContent='loading…';
   try{
-    const[aR,dR,pR,hR,tsR]=await Promise.all([
+    const[aR,dR,pR,hR,tsR,wR]=await Promise.all([
       fj(TARGON+'/chain.getAuctionState?batch=1&input='+encB(null)),
       fj(TAO_XYZ+'/delegations.getLatestDelegations?input='+enc({subnetId:4,pageIndex:0,pageSize:100,eventType:'all'})),
       fj(TAO_XYZ+'/subnet.getSubnetSlippageParams?input='+enc(null)),
       fj(TARGON+'/chain.getHistoricalPayoutDataByComputeType?batch=1&input='+encB({days:30})),
       fj('https://taostats.io/api/subnet/subnet?netuid=4'),
+      fj(TAO_XYZ+'/wallet.getHistoricalBalance?input='+enc({wallet:'5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv',currency:'alpha',netuid:4})),
     ]);
     const d=aR[0].result.data.json;
     const events=dR.result.data.json.data;
     const sn4=pR.result.data.json.find(s=>s.netuid===4);
     const hist=Object.values(hR[0].result.data.json);
     const incentiveBurn=parseFloat(tsR.data?.[0]?.incentive_burn||0);
+    // Wallet staking yield: 24h delta in alpha
+    const wBal=wR.result.data.json;
+    const wFirst=wBal[0],wLast=wBal[wBal.length-1];
+    const wSpanH=(wLast.timestamp-wFirst.timestamp)/(3600*1000);
+    const wDelta=wLast.balance-wFirst.balance;
+    const yieldPerDay=wSpanH>0?wDelta/(wSpanH/24):0;
+    const apyPct=wLast.balance>0?yieldPerDay*365/wLast.balance*100:0;
 
     // --- Pool ---
     const alphaIn=sn4.alpha_in,taoIn=sn4.tao_in;
@@ -238,14 +246,15 @@ async function loadAll(){
     document.getElementById('b-budget').textContent='$'+fK(budgetUSD);
     document.getElementById('b-budget-sub').textContent='2,952α × Ⱥ'+ap.toFixed(4);
     document.getElementById('b-payout').textContent='$'+fK(dailyPayout);
-    document.getElementById('b-payout-sub').textContent='$'+f1(totalHourly)+'/hr · '+totalCards+' cards';
+    document.getElementById('b-payout-sub').textContent='$'+f1(totalHourly)+'/hr · '+f1(utilRate)+'% of net';
     document.getElementById('b-burn').textContent=f1(burnRate)+'%';
-    document.getElementById('b-burn-sub').textContent=f1(utilRate)+'% of net utilized';
+    document.getElementById('b-burn-sub').textContent=Math.round(minerBudget*incentiveBurn).toLocaleString()+'α burned/day';
     document.getElementById('b-net').textContent='$'+fK(netAllocUSD);
     document.getElementById('b-net-sub').textContent=Math.round(netAllocAlpha).toLocaleString()+'α · burn '+f1(burnRate)+'%';
-    document.getElementById('b-owner').textContent=ownerTAO+' TAO';
-    document.getElementById('b-owner-sub').textContent='$'+fK(ownerUSD)+' · 1,296α';
-    document.getElementById('b-yield').textContent='—';
+    document.getElementById('b-yield').textContent=f1(yieldPerDay)+'α';
+    document.getElementById('b-yield-sub').textContent='Ⱥ'+wFirst.balance.toFixed(0)+' → '+wLast.balance.toFixed(0)+' ('+f1(wSpanH)+'h)';
+    document.getElementById('b-apy').textContent=f1(apyPct)+'%';
+    document.getElementById('b-apy-sub').textContent='on '+Math.round(wLast.balance).toLocaleString()+'α staked';
 
     // --- Delegations: use ISO date slice(0,10) ---
     const todayISO=new Date().toISOString().slice(0,10);
