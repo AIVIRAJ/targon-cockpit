@@ -257,7 +257,7 @@ async function loadAll(){
     document.getElementById('b-yield').textContent=f1(yieldPerDay)+'α';
     document.getElementById('b-yield-sub').textContent='Ⱥ'+wFirstBal.toFixed(0)+' → '+wLastBal.toFixed(0)+' ('+f1(wSpanH)+'h)';
     document.getElementById('b-apy').textContent=f1(apyPct)+'%';
-    document.getElementById('b-apy-sub').textContent='on '+Math.round(wLast.balance).toLocaleString()+'α staked';
+    document.getElementById('b-apy-sub').textContent='on '+Math.round(wLastBal).toLocaleString()+'α staked';
 
     // --- Delegations: use ISO date slice(0,10) ---
     const todayISO=new Date().toISOString().slice(0,10);
