@@ -186,7 +186,7 @@ async function loadAll(){
       fj(TAO_XYZ+'/subnet.getSubnetSlippageParams?input='+enc(null)),
       fj(TARGON+'/chain.getHistoricalPayoutDataByComputeType?batch=1&input='+encB({days:30})),
       fj('https://taostats.io/api/subnet/subnet?netuid=4'),
-      fj('/api/taostats?path=dtao/stake_balance/history/v1&coldkey=5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv&netuid=4&limit=8&order=desc'),
+      fj('/api/taostats?path=dtao/stake_balance/history/v1&coldkey=5CXGPMnq9RCCLUEvp9G2iUuabw69TSFM155UVS1S4Zmusaxv&hotkey=5Hp18g9P8hLGKp9W3ZDr4bvJwba6b6bY3P2u3VdYf8yMR8FM&netuid=4&limit=8&order=timestamp_desc'),
     ]);
     const d=aR[0].result.data.json;
     const events=dR.result.data.json.data;
@@ -194,13 +194,14 @@ async function loadAll(){
     const hist=Object.values(hR[0].result.data.json);
     const incentiveBurn=parseFloat(tsR.data?.[0]?.incentive_burn||0);
     // Wallet staking yield: 24h delta in alpha
-    const wRows=(wR.data||[]).slice().reverse(); // oldest first
+    // taostats returns newest first — reverse to get oldest→newest
+    const wRows=(wR.data||[]).slice().reverse();
     const wFirst=wRows[0],wLast=wRows[wRows.length-1];
     const wFirstBal=wFirst?parseInt(wFirst.balance)/1e9:0;
     const wLastBal=wLast?parseInt(wLast.balance)/1e9:0;
-    const wSpanH=wFirst&&wLast?(new Date(wLast.timestamp)-new Date(wFirst.timestamp))/(3600*1000):0;
-    const wDelta=wLastBal-wFirstBal;
-    const yieldPerDay=wSpanH>0?wDelta/(wSpanH/24):0;
+    const wSpanH=(wFirst&&wLast&&wFirst.timestamp&&wLast.timestamp)?
+      (new Date(wLast.timestamp)-new Date(wFirst.timestamp))/(3600*1000):0;
+    const yieldPerDay=wSpanH>0?(wLastBal-wFirstBal)/(wSpanH/24):0;
     const apyPct=wLastBal>0?yieldPerDay*365/wLastBal*100:0;
 
     // --- Pool ---
